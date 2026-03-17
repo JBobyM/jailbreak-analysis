@@ -167,6 +167,7 @@ def get_defense(name: str) -> Defense:
 
 def run_defense_pipeline(
     defense_name: str,
+    attack_framing: str = "direct",
     limit: Optional[int] = DEFAULT_LIMIT,
 ) -> dict:
     """Run the full defense pipeline: attack → judge → compute delta-ASR.
@@ -181,22 +182,36 @@ def run_defense_pipeline(
         logger.error("Ollama not available. Run: ollama pull %s", MODEL_NAME)
         raise SystemExit(1)
 
+    from src.attacks import get_framing
+    from src.config import DEFENSE_ROLEPLAY_FILES
+
     defense = get_defense(defense_name)
-    raw_path = DEFENSE_FILES[defense_name].with_name(
-        DEFENSE_FILES[defense_name].stem.replace("_labeled", "") + "_raw.jsonl"
+    file_map = DEFENSE_ROLEPLAY_FILES if attack_framing != "direct" else DEFENSE_FILES
+    raw_path = file_map[defense_name].with_name(
+        file_map[defense_name].stem.replace("_labeled", "") + "_raw.jsonl"
     )
-    labeled_path = DEFENSE_FILES[defense_name]
+    labeled_path = file_map[defense_name]
 
     behaviors = load_behaviors(limit=limit)
 
+    # Apply attack framing
+    if attack_framing != "direct":
+        framing_fn = get_framing(attack_framing)
+        behaviors = [{**b, "prompt": framing_fn(b["goal"])} for b in behaviors]
+        logger.info("Applied '%s' framing to all prompts", attack_framing)
+
+    # Determine comparison baseline
+    from src.config import ATTACK_FILES
+    baseline_ref = ATTACK_FILES.get(attack_framing, BASELINE_LABELED)
+
     # Step 1: run attacks with defense
-    logger.info("Running attacks with defense: %s", defense_name)
+    logger.info("Running attacks with defense: %s (framing: %s)", defense_name, attack_framing)
     results = run_attacks(
         behaviors,
         raw_path,
         system_prompt=defense.system_prompt,
         input_filter_fn=defense.input_filter,
-        mode_tag=f"defense_{defense_name}",
+        mode_tag=f"defense_{defense_name}_{attack_framing}",
     )
 
     # Step 2: apply output filter (if any) post-generation
@@ -218,10 +233,10 @@ def run_defense_pipeline(
     # Step 4: compute delta-ASR
     defense_asr = sum(r["complied"] for r in labeled) / len(labeled) if labeled else 0.0
 
-    # Load baseline for comparison
+    # Load baseline for comparison (use framing-matched baseline)
     baseline_asr = None
-    if BASELINE_LABELED.exists():
-        baseline_records = [json.loads(l) for l in BASELINE_LABELED.read_text().splitlines() if l.strip()]
+    if baseline_ref.exists():
+        baseline_records = [json.loads(l) for l in baseline_ref.read_text().splitlines() if l.strip()]
         baseline_asr = sum(r["complied"] for r in baseline_records) / len(baseline_records) if baseline_records else 0.0
 
     result = {
@@ -256,11 +271,15 @@ def main() -> None:
         choices=list(_DEFENSE_REGISTRY),
         help="Which defense to apply"
     )
+    parser.add_argument(
+        "--attack", choices=["direct", "roleplay"], default="direct",
+        help="Attack framing to apply before the defense"
+    )
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help="Max prompts to evaluate")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    run_defense_pipeline(args.defense, limit=args.limit)
+    run_defense_pipeline(args.defense, attack_framing=args.attack, limit=args.limit)
 
 
 if __name__ == "__main__":

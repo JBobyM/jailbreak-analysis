@@ -158,14 +158,22 @@ def run_attacks(
 # ── CLI entry point ────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run jailbreak attacks against Llama 3 via Ollama")
+    parser = argparse.ArgumentParser(description="Run jailbreak attacks against a model via Ollama")
     parser.add_argument(
-        "--mode", choices=["baseline", "defense"], default="baseline",
-        help="Run mode: 'baseline' (no system prompt) or 'defense' (apply a defense)"
+        "--mode", choices=["baseline", "defense", "attack"], default="baseline",
+        help="Run mode"
     )
     parser.add_argument(
         "--defense", choices=["sysprompt", "input_filter", "output_classifier"],
-        default=None, help="Which defense to apply (only used with --mode defense)"
+        default=None, help="Which defense to apply (--mode defense)"
+    )
+    parser.add_argument(
+        "--attack", choices=["direct", "roleplay"],
+        default="direct", help="Attack framing to apply (--mode attack or baseline)"
+    )
+    parser.add_argument(
+        "--model", type=str, default=None,
+        help="Override Ollama model tag (default: MODEL_NAME from config)"
     )
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help="Max number of prompts")
     parser.add_argument("--output", type=str, default=None, help="Override output JSONL path")
@@ -174,42 +182,58 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    # Verify Ollama
-    if not check_ollama_available():
-        logger.error(
-            "Ollama is not available or model '%s' is not pulled. "
-            "Run: ollama pull %s", MODEL_NAME, MODEL_NAME
-        )
+    model = args.model or MODEL_NAME
+
+    if not check_ollama_available(model=model):
+        logger.error("Ollama model '%s' not available. Run: ollama pull %s", model, model)
         raise SystemExit(1)
 
     behaviors = load_behaviors(limit=args.limit)
     logger.info("Loaded %d behaviors", len(behaviors))
 
-    if args.mode == "baseline":
-        output = Path(args.output) if args.output else BASELINE_RAW
-        run_attacks(behaviors, output, system_prompt=None, mode_tag="baseline", batch_size=args.batch_size)
+    # Apply attack framing to prompts
+    from src.attacks import get_framing
+    framing_fn = get_framing(args.attack)
+    if args.attack != "direct":
+        logger.info("Applying '%s' framing to all prompts", args.attack)
+        behaviors = [{**b, "prompt": framing_fn(b["goal"])} for b in behaviors]
+
+    if args.mode in ("baseline", "attack"):
+        from src.config import RESULTS_DIR
+        if args.output:
+            output = Path(args.output)
+        elif args.attack != "direct":
+            output = RESULTS_DIR / f"attack_{args.attack}_{model.replace(':', '_')}.jsonl"
+        elif model != MODEL_NAME:
+            output = RESULTS_DIR / f"baseline_{model.replace(':', '_')}.jsonl"
+        else:
+            output = BASELINE_RAW
+        mode_tag = f"baseline_{model}" if model != MODEL_NAME else f"baseline_{args.attack}"
+        run_attacks(behaviors, output, system_prompt=None, mode_tag=mode_tag)
 
     elif args.mode == "defense":
         if args.defense is None:
             parser.error("--defense is required when --mode defense")
-
-        # Import here to avoid circular imports
         from src.defenses import get_defense
+        from src.config import DEFENSE_FILES, DEFENSE_ROLEPLAY_FILES, RESULTS_DIR
         defense = get_defense(args.defense)
-        from src.config import DEFENSE_FILES
-        output = Path(args.output) if args.output else DEFENSE_FILES[args.defense].with_name(
-            DEFENSE_FILES[args.defense].stem.replace("_labeled", "") + ".jsonl"
-        )
+        if args.output:
+            output = Path(args.output)
+        elif args.attack != "direct":
+            output = DEFENSE_ROLEPLAY_FILES[args.defense].with_name(
+                DEFENSE_ROLEPLAY_FILES[args.defense].stem.replace("_labeled", "_raw") + ".jsonl"
+            )
+        else:
+            output = DEFENSE_FILES[args.defense].with_name(
+                DEFENSE_FILES[args.defense].stem.replace("_labeled", "") + ".jsonl"
+            )
         run_attacks(
-            behaviors,
-            output,
+            behaviors, output,
             system_prompt=defense.system_prompt,
             input_filter_fn=defense.input_filter,
-            mode_tag=f"defense_{args.defense}",
-            batch_size=args.batch_size,
+            mode_tag=f"defense_{args.defense}_{args.attack}",
         )
-        logger.info("Raw defense results saved to %s", output)
-        logger.info("Run judge.py on this file, then analyze.py for delta-ASR.")
+        logger.info("Raw results saved to %s — run judge.py next.", output)
 
     logger.info("Done.")
 

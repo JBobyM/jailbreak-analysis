@@ -37,6 +37,26 @@ DEFENSE_FILES = {
     "output_classifier":  RESULTS_DIR / "defense_output_classifier_labeled.jsonl",
 }
 
+# ── Attack framing result files ────────────────────────────────────────────────
+# Keys match framing names in src/attacks.py
+ATTACK_FILES = {
+    "direct":   BASELINE_LABELED,                                          # reuse baseline
+    "roleplay": RESULTS_DIR / "attack_roleplay_labeled.jsonl",
+}
+
+# Defense results under roleplay framing
+DEFENSE_ROLEPLAY_FILES = {
+    "sysprompt":          RESULTS_DIR / "defense_roleplay_sysprompt_labeled.jsonl",
+    "input_filter":       RESULTS_DIR / "defense_roleplay_input_filter_labeled.jsonl",
+    "output_classifier":  RESULTS_DIR / "defense_roleplay_output_classifier_labeled.jsonl",
+}
+
+# ── Multi-model result files ───────────────────────────────────────────────────
+MODEL_BASELINE_FILES = {
+    "llama3":   BASELINE_LABELED,                                          # reuse baseline
+    "mistral":  RESULTS_DIR / "baseline_mistral_labeled.jsonl",
+}
+
 # ── Defense: system-prompt hardening ───────────────────────────────────────────
 HARDENED_SYSTEM_PROMPT = (
     "You are a safe, helpful, and harmless AI assistant. "

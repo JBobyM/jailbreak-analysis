@@ -32,7 +32,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.config import BASELINE_LABELED, DEFENSE_FILES, FIGURES_DIR
+from src.config import (
+    BASELINE_LABELED, DEFENSE_FILES, FIGURES_DIR,
+    ATTACK_FILES, MODEL_BASELINE_FILES, DEFENSE_ROLEPLAY_FILES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +179,88 @@ def plot_defense_comparison(defense_stats: list[dict], baseline_asr: float, out_
     logger.info("Saved: %s", out_path)
 
 
+def plot_asr_by_framing(out_path: Path) -> None:
+    """Bar chart: ASR by attack framing (direct vs roleplay)."""
+    rows = []
+    for framing, labeled_path in ATTACK_FILES.items():
+        if not labeled_path.exists():
+            logger.info("Framing '%s' results not found (skipping)", framing)
+            continue
+        df = load_jsonl(labeled_path)
+        if "complied" not in df.columns:
+            continue
+        rows.append({"framing": framing, "asr_pct": asr(df["complied"]) * 100, "n": len(df)})
+
+    if len(rows) < 2:
+        logger.info("Need at least 2 framings for comparison chart (skipping)")
+        return
+
+    data = sorted(rows, key=lambda r: r["asr_pct"])
+    labels = [r["framing"] for r in data]
+    values = [r["asr_pct"] for r in data]
+    colors = ["#1f77b4" if l == "direct" else "#d62728" for l in labels]
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    bars = ax.bar(labels, values, color=colors, edgecolor="black", linewidth=0.7)
+    ax.bar_label(bars, fmt="%.1f%%", padding=4, fontsize=11)
+    ax.set_ylabel("Attack Success Rate (%)", fontsize=11)
+    ax.set_title("ASR by Attack Framing (Llama 3 8B)", fontsize=13, fontweight="bold")
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.set_ylim(0, max(values) * 1.4 + 5)
+    plt.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Saved: %s", out_path)
+
+    print(f"\n  ASR BY ATTACK FRAMING")
+    for r in rows:
+        print(f"  {r['framing']:<15s}  {r['asr_pct']:.1f}%  (n={r['n']})")
+
+
+def plot_asr_by_model(out_path: Path) -> None:
+    """Bar chart: ASR by model (direct-request framing only)."""
+    rows = []
+    model_labels = {"llama3": "Llama 3 8B", "mistral": "Mistral 7B"}
+    for model_key, labeled_path in MODEL_BASELINE_FILES.items():
+        if not labeled_path.exists():
+            logger.info("Model '%s' results not found (skipping)", model_key)
+            continue
+        df = load_jsonl(labeled_path)
+        if "complied" not in df.columns:
+            continue
+        rows.append({
+            "model": model_labels.get(model_key, model_key),
+            "asr_pct": asr(df["complied"]) * 100,
+            "n": len(df),
+        })
+
+    if len(rows) < 2:
+        logger.info("Need at least 2 models for comparison chart (skipping)")
+        return
+
+    labels = [r["model"] for r in rows]
+    values = [r["asr_pct"] for r in rows]
+    colors = sns.color_palette("Set2", len(rows))
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    bars = ax.bar(labels, values, color=colors, edgecolor="black", linewidth=0.7)
+    ax.bar_label(bars, fmt="%.1f%%", padding=4, fontsize=11)
+    ax.set_ylabel("Attack Success Rate (%)", fontsize=11)
+    ax.set_title("ASR by Model (Direct-Request Framing)", fontsize=13, fontweight="bold")
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.set_ylim(0, max(values) * 1.4 + 5)
+    plt.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Saved: %s", out_path)
+
+    print(f"\n  ASR BY MODEL (direct-request)")
+    for r in rows:
+        print(f"  {r['model']:<15s}  {r['asr_pct']:.1f}%  (n={r['n']})")
+
+
 def analyze_defenses(baseline_asr: float) -> list[dict]:
     """Load all available defense result files and compute delta-ASR."""
     stats = []
@@ -250,6 +335,10 @@ def main() -> None:
             defense_stats, stats["overall_asr"],
             FIGURES_DIR / "defense_comparison.png"
         )
+
+    # v2: attack framing + model comparison charts (generated if data exists)
+    plot_asr_by_framing(FIGURES_DIR / "asr_by_attack_framing.png")
+    plot_asr_by_model(FIGURES_DIR / "asr_by_model.png")
 
     print(f"\nFigures saved to: {FIGURES_DIR}/")
 
