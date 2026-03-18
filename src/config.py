@@ -21,7 +21,7 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # Generation parameters
 MAX_TOKENS = 512
-TEMPERATURE = 0.7
+TEMPERATURE = 0.9
 TOP_P = 0.9
 REQUEST_TIMEOUT = 120   # seconds per Ollama request
 MAX_RETRIES = 3
