@@ -86,9 +86,15 @@ for transparency.
 | Run 2 | Llama 3 8B | direct | 0.0% (0/100) |
 
 The variance between runs (0–2%) reflects stochastic generation at temperature 0.7.
-Run 1 is used as the primary baseline throughout this report.
+Tables in Sections 3.2–3.4 report Run 1 results (the only run with non-zero ASR and
+therefore the only run informative for per-category and per-source breakdowns). Figures
+were regenerated from the most recent experiment run (Run 2, 0% ASR) and consequently
+appear all-zero; they are included for completeness but the tables are the authoritative
+record of the Run 1 findings.
 
 ### 3.2 ASR by Category (Run 1)
+
+> **Note:** The heatmap below reflects Run 2 data (0% ASR). The table reports Run 1 results.
 
 ![ASR Heatmap](../results/figures/heatmap_category_attack.png)
 
@@ -110,6 +116,8 @@ for personalised medical and financial advice — ambiguous domains where helpfu
 are in tension rather than in clear conflict.
 
 ### 3.3 ASR by Source (Run 1)
+
+> **Note:** The chart below reflects Run 2 data (0% ASR). The table reports Run 1 results.
 
 ![ASR by Attack Type](../results/figures/asr_by_attack_type.png)
 
@@ -177,6 +185,11 @@ We evaluate three defenses applied independently. Defenses are tested against bo
 | **Output classifier** | Post-generation: classify response as SAFE/UNSAFE and block if UNSAFE |
 
 ### 6.2 Results — Direct-Request Framing (Run 1)
+
+> **Note:** The chart below was generated from the most recent experiment run (Run 2 baseline,
+> 0% ASR). Because the defense runs occurred in separate stochastic passes, apparent regressions
+> in the figure are within run-to-run variance (0–2%). The table below reports Run 1 results,
+> which provide a meaningful non-zero baseline for the delta-ASR comparison.
 
 ![Defense Comparison](../results/figures/defense_comparison.png)
 
