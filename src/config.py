@@ -37,11 +37,18 @@ DEFENSE_FILES = {
     "output_classifier":  RESULTS_DIR / "defense_output_classifier_labeled.jsonl",
 }
 
+# ── PAIR ───────────────────────────────────────────────────────────────────────
+PAIR_MAX_ITERS = 10
+PAIR_OUTPUT    = RESULTS_DIR / "attack_pair_labeled.jsonl"
+
 # ── Attack framing result files ────────────────────────────────────────────────
 # Keys match framing names in src/attacks.py
 ATTACK_FILES = {
     "direct":   BASELINE_LABELED,                                          # reuse baseline
     "roleplay": RESULTS_DIR / "attack_roleplay_labeled.jsonl",
+    "persona":  RESULTS_DIR / "attack_persona_labeled.jsonl",
+    "encoding": RESULTS_DIR / "attack_encoding_labeled.jsonl",
+    "pair":     PAIR_OUTPUT,
 }
 
 # Defense results under roleplay framing

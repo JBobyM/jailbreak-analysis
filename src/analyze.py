@@ -35,6 +35,7 @@ import seaborn as sns
 from src.config import (
     BASELINE_LABELED, DEFENSE_FILES, FIGURES_DIR,
     ATTACK_FILES, MODEL_BASELINE_FILES, DEFENSE_ROLEPLAY_FILES,
+    PAIR_OUTPUT,
 )
 
 logger = logging.getLogger(__name__)
@@ -180,33 +181,53 @@ def plot_defense_comparison(defense_stats: list[dict], baseline_asr: float, out_
 
 
 def plot_asr_by_framing(out_path: Path) -> None:
-    """Bar chart: ASR by attack framing (direct vs roleplay)."""
+    """Bar chart: ASR by attack framing (all available framings)."""
+    FRAMING_ORDER = ["direct", "roleplay", "persona", "encoding", "pair"]
+    FRAMING_LABELS = {
+        "direct":   "Direct",
+        "roleplay": "Roleplay",
+        "persona":  "Persona (DAN)",
+        "encoding": "Encoding (B64)",
+        "pair":     "PAIR",
+    }
+    FRAMING_COLORS = {
+        "direct":   "#1f77b4",
+        "roleplay": "#ff7f0e",
+        "persona":  "#d62728",
+        "encoding": "#9467bd",
+        "pair":     "#8c1a0a",
+    }
+
     rows = []
-    for framing, labeled_path in ATTACK_FILES.items():
-        if not labeled_path.exists():
-            logger.info("Framing '%s' results not found (skipping)", framing)
+    for framing in FRAMING_ORDER:
+        labeled_path = ATTACK_FILES.get(framing)
+        if labeled_path is None or not labeled_path.exists():
             continue
         df = load_jsonl(labeled_path)
         if "complied" not in df.columns:
             continue
-        rows.append({"framing": framing, "asr_pct": asr(df["complied"]) * 100, "n": len(df)})
+        rows.append({
+            "framing": framing,
+            "label":   FRAMING_LABELS[framing],
+            "asr_pct": asr(df["complied"]) * 100,
+            "n":       len(df),
+        })
 
     if len(rows) < 2:
         logger.info("Need at least 2 framings for comparison chart (skipping)")
         return
 
-    data = sorted(rows, key=lambda r: r["asr_pct"])
-    labels = [r["framing"] for r in data]
-    values = [r["asr_pct"] for r in data]
-    colors = ["#1f77b4" if l == "direct" else "#d62728" for l in labels]
+    labels = [r["label"] for r in rows]
+    values = [r["asr_pct"] for r in rows]
+    colors = [FRAMING_COLORS[r["framing"]] for r in rows]
 
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=(max(7, len(rows) * 1.4), 5))
     bars = ax.bar(labels, values, color=colors, edgecolor="black", linewidth=0.7)
     ax.bar_label(bars, fmt="%.1f%%", padding=4, fontsize=11)
     ax.set_ylabel("Attack Success Rate (%)", fontsize=11)
-    ax.set_title("ASR by Attack Framing (Llama 3 8B)", fontsize=13, fontweight="bold")
+    ax.set_title("ASR by Attack Technique (Llama 3 8B)", fontsize=13, fontweight="bold")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
-    ax.set_ylim(0, max(values) * 1.4 + 5)
+    ax.set_ylim(0, max(max(values) * 1.4, 10))
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -215,7 +236,45 @@ def plot_asr_by_framing(out_path: Path) -> None:
 
     print(f"\n  ASR BY ATTACK FRAMING")
     for r in rows:
-        print(f"  {r['framing']:<15s}  {r['asr_pct']:.1f}%  (n={r['n']})")
+        print(f"  {r['label']:<20s}  {r['asr_pct']:.1f}%  (n={r['n']})")
+
+
+def plot_pair_convergence(out_path: Path) -> None:
+    """Line chart: cumulative ASR by PAIR iteration number."""
+    if not PAIR_OUTPUT.exists():
+        logger.info("PAIR results not found (skipping convergence plot)")
+        return
+
+    df = load_jsonl(PAIR_OUTPUT)
+    if "iters_used" not in df.columns or "complied" not in df.columns:
+        logger.info("PAIR file missing required columns (skipping)")
+        return
+
+    max_iters = int(df["iters_used"].max())
+    total = len(df)
+    cumulative = []
+    for i in range(1, max_iters + 1):
+        succeeded = df[(df["success"] == True) & (df["iters_used"] <= i)].shape[0]
+        cumulative.append(100 * succeeded / total)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(range(1, max_iters + 1), cumulative, marker="o", color="#8c1a0a", linewidth=2)
+    ax.fill_between(range(1, max_iters + 1), cumulative, alpha=0.15, color="#8c1a0a")
+    ax.set_xlabel("PAIR Iteration", fontsize=11)
+    ax.set_ylabel("Cumulative ASR (%)", fontsize=11)
+    ax.set_title("PAIR: Cumulative Attack Success Rate by Iteration", fontsize=13, fontweight="bold")
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.set_xlim(1, max_iters)
+    ax.set_ylim(0, max(max(cumulative) * 1.3, 10))
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    plt.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Saved: %s", out_path)
+
+    final_asr = cumulative[-1] if cumulative else 0
+    print(f"\n  PAIR CONVERGENCE: final ASR={final_asr:.1f}% over {max_iters} iterations")
 
 
 def plot_asr_by_model(out_path: Path) -> None:
@@ -336,9 +395,10 @@ def main() -> None:
             FIGURES_DIR / "defense_comparison.png"
         )
 
-    # v2: attack framing + model comparison charts (generated if data exists)
+    # attack framing + model comparison + PAIR convergence (generated if data exists)
     plot_asr_by_framing(FIGURES_DIR / "asr_by_attack_framing.png")
     plot_asr_by_model(FIGURES_DIR / "asr_by_model.png")
+    plot_pair_convergence(FIGURES_DIR / "pair_convergence.png")
 
     print(f"\nFigures saved to: {FIGURES_DIR}/")
 

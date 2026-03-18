@@ -168,7 +168,7 @@ def main() -> None:
         default=None, help="Which defense to apply (--mode defense)"
     )
     parser.add_argument(
-        "--attack", choices=["direct", "roleplay"],
+        "--attack", choices=["direct", "roleplay", "persona", "encoding"],
         default="direct", help="Attack framing to apply (--mode attack or baseline)"
     )
     parser.add_argument(
