@@ -235,17 +235,19 @@ System-prompt hardening got to 0%, and so did the output classifier. Both work, 
 different mechanisms -- one prevents the problem at the front, the other catches it at the
 back.
 
-The keyword filter's partial result (1%) is exactly what you'd expect from a list-based
-approach. It catches what's on the list. One of the two complied prompts didn't contain any
-of the blocked terms, so it went straight through. You can patch the list, but you'll always
-be playing catch-up with rephrasing.
+The keyword filter's 1% result needs a careful reading. The filter blocked 6 prompts in
+total -- but neither of the 2 prompts that complied in the baseline was among them. Both
+the betting tips and the investment bot prompts contain no terms from the blocked keyword
+list. The drop from 2% to 1% is run-to-run variance, not the filter working. You can patch
+the list, but you'll always be playing catch-up with paraphrasing, and the prompts most
+likely to slip through are exactly the ambiguous ones the list was never designed to catch.
 
 It's worth noting that the output classifier's success here is specific to this dataset.
-The two complied responses in the baseline were professional-sounding medical and financial
-text -- and the classifier happened to flag them. On a different run or a different set of
-behaviors, it might not. System-prompt hardening is more reliably robust because it changes
-what the model is willing to generate in the first place, rather than trying to detect
-harm after the fact.
+The two complied responses in the baseline were advisory-sounding text (betting tips,
+investment guidance) -- and the classifier happened to flag them. On a different run or a
+different set of behaviors, it might not. System-prompt hardening is more reliably robust
+because it changes what the model is willing to generate in the first place, rather than
+trying to detect harm after the fact.
 
 ---
 
