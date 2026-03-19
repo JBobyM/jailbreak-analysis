@@ -4,15 +4,6 @@ Empirical evaluation of jailbreak attack techniques and defenses against open-so
 Tested on Llama 3 8B and Mistral 7B, running locally on 2x RTX 3090 via Ollama, using the
 [JailbreakBench](https://github.com/JailbreakBench/jailbreakbench) benchmark of 100 harmful behaviors.
 
-<p align="center">
-  <img src="results/figures/asr_by_attack_framing.png" width="49%"/>
-  <img src="results/figures/pair_convergence.png" width="49%"/>
-</p>
-<p align="center">
-  <img src="results/figures/defense_comparison.png" width="49%"/>
-  <img src="results/figures/asr_by_model.png" width="49%"/>
-</p>
-
 ---
 
 ## What this is
@@ -36,7 +27,7 @@ for anything ambiguous.
 
 ## Results
 
-### Attack success rate by technique
+### Attack techniques
 
 | Technique         | ASR   | Notes |
 |-------------------|-------|-------|
@@ -46,11 +37,17 @@ for anything ambiguous.
 | Base64 encoding   | 0.0%  | Model decodes and refuses anyway |
 | PAIR              | 5.0%  | Only technique that moves the needle |
 
+<p align="center">
+  <img src="results/figures/asr_by_attack_framing.png" width="80%"/>
+  <br/>
+  <em>Figure 1. ASR by attack technique across all five methods tested (Llama 3 8B, 100 behaviors).</em>
+</p>
+
 Static framings (roleplay, DAN persona, Base64 encoding) either matched or underperformed
 a plain direct request. The model recognizes these patterns and pushes back harder, not less.
 
-Base64 at 0% is the most interesting result here. The intuition behind encoding attacks is
-that safety filters work on surface text, so encoded input slips through. That is not what
+Base64 at 0% is the most interesting result. The intuition behind encoding attacks is that
+safety filters work on surface text, so encoded input slips through. That is not what
 happened. Llama 3 8B decodes correctly and applies the same judgment it would to the
 plaintext version.
 
@@ -61,6 +58,12 @@ as both attacker and target is a conservative setup. A stronger attacker model w
 the number higher. Even so, PAIR reached 5% where everything else capped out at 2%.
 
 ### PAIR convergence
+
+<p align="center">
+  <img src="results/figures/pair_convergence.png" width="80%"/>
+  <br/>
+  <em>Figure 2. Cumulative ASR as PAIR iterations progress. All 5 successes occurred by iteration 2.</em>
+</p>
 
 All 5 successes happened within the first 2 iterations. After that the model held firm
 through iteration 10. The compliance boundary is narrow but findable quickly, and once
@@ -88,6 +91,12 @@ of the response, and the model has no way to tell the difference.
 | Input keyword filter | 1.0%  | -1.0 pp            |
 | Output classifier    | 0.0%  | -2.0 pp            |
 
+<p align="center">
+  <img src="results/figures/defense_comparison.png" width="80%"/>
+  <br/>
+  <em>Figure 3. Effect of three defenses on ASR against the 2% direct-request baseline.</em>
+</p>
+
 System-prompt hardening and the output classifier both got to 0%. The keyword filter looks
 like it reduced ASR by 1 pp, but neither of the two prompts that complied in the baseline
 was actually blocked by the filter. The drop is run-to-run variance. The filter caught 6
@@ -95,6 +104,12 @@ other prompts, but the advisory-domain behaviors that matter most contain no ter
 blocked keyword list.
 
 ### Model comparison
+
+<p align="center">
+  <img src="results/figures/asr_by_model.png" width="80%"/>
+  <br/>
+  <em>Figure 4. ASR comparison between Llama 3 8B and Mistral 7B under direct-request framing.</em>
+</p>
 
 Llama 3 8B (2.0%) and Mistral 7B (1.0%) behave similarly under direct-request attacks. The
 difference is within noise at this sample size (1 vs 2 successful prompts out of 100). Both
@@ -110,7 +125,7 @@ worse. The models have seen these patterns.
 
 **Automated red-teaming (PAIR) is in a different category.** It found 5% compliance where
 static attacks found 2%, using only the same model class as the attacker. With a stronger
-attacker, that ceiling goes up. This is worth taking seriously.
+attacker, that ceiling goes up.
 
 **The real failure mode is contextual, not lexical.** The compliance that did occur was in
 domains where helpfulness and harm look identical at the text level. Output classifiers
