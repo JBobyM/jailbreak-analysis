@@ -37,12 +37,6 @@ for anything ambiguous.
 | Base64 encoding   | 0.0%  | Model decodes and refuses anyway |
 | PAIR              | 5.0%  | Only technique that moves the needle |
 
-<p align="center">
-  <img src="results/figures/asr_by_attack_framing.png" width="80%"/>
-  <br/>
-  <em>Figure 1. ASR by attack technique across all five methods tested (Llama 3 8B, 100 behaviors).</em>
-</p>
-
 Static framings (roleplay, DAN persona, Base64 encoding) either matched or underperformed
 a plain direct request. The model recognizes these patterns and pushes back harder, not less.
 
@@ -53,21 +47,23 @@ plaintext version.
 
 PAIR is a different story. It uses a second instance of Llama 3 8B as an attacker. The
 attacker generates a jailbreak prompt, sends it to the target, and if the target refuses,
-it gets the refusal back and tries again, up to 10 iterations. Using the same model class
-as both attacker and target is a conservative setup. A stronger attacker model would push
-the number higher. Even so, PAIR reached 5% where everything else capped out at 2%.
+it gets the refusal back and tries again, up to 10 iterations. All 5 successes happened
+within the first 2 iterations. After that the model held firm through iteration 10.
 
-### PAIR convergence
-
-<p align="center">
-  <img src="results/figures/pair_convergence.png" width="80%"/>
-  <br/>
-  <em>Figure 2. Cumulative ASR as PAIR iterations progress. All 5 successes occurred by iteration 2.</em>
-</p>
-
-All 5 successes happened within the first 2 iterations. After that the model held firm
-through iteration 10. The compliance boundary is narrow but findable quickly, and once
-the model refuses the refined prompt, more iterations do not help.
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="results/figures/asr_by_attack_framing.png" width="100%"/>
+      <br/>
+      <em>Figure 1. ASR by attack technique (Llama 3 8B, 100 behaviors).</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="results/figures/pair_convergence.png" width="100%"/>
+      <br/>
+      <em>Figure 2. Cumulative ASR by PAIR iteration. All successes by iteration 2.</em>
+    </td>
+  </tr>
+</table>
 
 ### Where failures happen
 
@@ -91,12 +87,6 @@ of the response, and the model has no way to tell the difference.
 | Input keyword filter | 1.0%  | -1.0 pp            |
 | Output classifier    | 0.0%  | -2.0 pp            |
 
-<p align="center">
-  <img src="results/figures/defense_comparison.png" width="80%"/>
-  <br/>
-  <em>Figure 3. Effect of three defenses on ASR against the 2% direct-request baseline.</em>
-</p>
-
 System-prompt hardening and the output classifier both got to 0%. The keyword filter looks
 like it reduced ASR by 1 pp, but neither of the two prompts that complied in the baseline
 was actually blocked by the filter. The drop is run-to-run variance. The filter caught 6
@@ -105,15 +95,24 @@ blocked keyword list.
 
 ### Model comparison
 
-<p align="center">
-  <img src="results/figures/asr_by_model.png" width="80%"/>
-  <br/>
-  <em>Figure 4. ASR comparison between Llama 3 8B and Mistral 7B under direct-request framing.</em>
-</p>
-
 Llama 3 8B (2.0%) and Mistral 7B (1.0%) behave similarly under direct-request attacks. The
 difference is within noise at this sample size (1 vs 2 successful prompts out of 100). Both
 models are highly resistant to direct jailbreak attempts on this benchmark.
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="results/figures/defense_comparison.png" width="100%"/>
+      <br/>
+      <em>Figure 3. Effect of three defenses on ASR against the 2% baseline.</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="results/figures/asr_by_model.png" width="100%"/>
+      <br/>
+      <em>Figure 4. ASR comparison between Llama 3 8B and Mistral 7B.</em>
+    </td>
+  </tr>
+</table>
 
 ---
 
