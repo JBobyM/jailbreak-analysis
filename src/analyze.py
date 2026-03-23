@@ -32,6 +32,50 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+# ── NeurIPS-style global rcParams ──────────────────────────────────────────────
+# Text width in NeurIPS = 5.5 in; use that as the reference for full-width figs.
+_NEURIPS_TEXT_W = 5.5   # inches
+_NEURIPS_HALF_W = 2.65  # inches  (half column)
+
+_RC = {
+    # Font — use STIX (closest to Times on most systems)
+    "font.family":        "STIXGeneral",
+    "mathtext.fontset":   "stix",
+    # Sizes (NeurIPS body = 10 pt → labels slightly smaller)
+    "font.size":           9,
+    "axes.titlesize":      9,
+    "axes.labelsize":      9,
+    "xtick.labelsize":     8,
+    "ytick.labelsize":     8,
+    "legend.fontsize":     8,
+    "axes.linewidth":      0.8,
+    "grid.linewidth":      0.5,
+    "lines.linewidth":     1.5,
+    "patch.linewidth":     0.7,
+    # Layout
+    "axes.spines.top":     False,
+    "axes.spines.right":   False,
+    "axes.grid":           True,
+    "grid.alpha":          0.3,
+    "figure.dpi":          300,
+    "savefig.dpi":         300,
+    "savefig.bbox":        "tight",
+    "savefig.pad_inches":  0.02,
+}
+plt.rcParams.update(_RC)
+
+# Wong (2011) colorblind-safe palette
+_WONG = [
+    "#0072B2",  # blue
+    "#E69F00",  # orange
+    "#009E73",  # green
+    "#D55E00",  # vermillion
+    "#CC79A7",  # pink/purple
+    "#56B4E9",  # sky blue
+    "#F0E442",  # yellow
+    "#000000",  # black
+]
+
 from src.config import (
     BASELINE_LABELED, DEFENSE_FILES, FIGURES_DIR,
     ATTACK_FILES, MODEL_BASELINE_FILES, DEFENSE_ROLEPLAY_FILES,
@@ -111,17 +155,17 @@ def plot_asr_by_attack_type(df: pd.DataFrame, out_path: Path) -> None:
     by_attack.columns = ["attack_type", "asr"]
     by_attack["asr_pct"] = by_attack["asr"] * 100
 
-    fig, ax = plt.subplots(figsize=(9, max(4, len(by_attack) * 0.5)))
-    colors = sns.color_palette("Reds_r", len(by_attack))
-    bars = ax.barh(by_attack["attack_type"], by_attack["asr_pct"], color=colors)
-    ax.bar_label(bars, fmt="%.1f%%", padding=4, fontsize=9)
-    ax.set_xlabel("Attack Success Rate (%)", fontsize=11)
-    ax.set_title("Attack Success Rate by Attack Type (Baseline)", fontsize=13, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(_NEURIPS_TEXT_W, max(2.8, len(by_attack) * 0.45)))
+    colors = _WONG[:len(by_attack)]
+    bars = ax.barh(by_attack["attack_type"], by_attack["asr_pct"], color=colors, height=0.55)
+    ax.bar_label(bars, fmt="%.1f%%", padding=3)
+    ax.set_xlabel("Attack Success Rate (%)")
+    ax.set_title("Attack Success Rate by Attack Type (Baseline)")
     ax.xaxis.set_major_formatter(mticker.PercentFormatter())
     ax.set_xlim(0, min(105, by_attack["asr_pct"].max() * 1.2 + 10))
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path)
     plt.close(fig)
     logger.info("Saved: %s", out_path)
 
@@ -136,24 +180,25 @@ def plot_heatmap(df: pd.DataFrame, out_path: Path) -> None:
         logger.warning("Not enough data for heatmap (need multiple categories and attack types).")
         return
 
-    fig, ax = plt.subplots(figsize=(max(8, pivot.shape[1] * 1.5), max(5, pivot.shape[0] * 0.7)))
+    fig, ax = plt.subplots(figsize=(_NEURIPS_TEXT_W, max(3.0, pivot.shape[0] * 0.5)))
     sns.heatmap(
         pivot * 100,
         annot=True,
         fmt=".0f",
         cmap="YlOrRd",
-        linewidths=0.5,
+        linewidths=0.4,
         ax=ax,
         vmin=0,
         vmax=100,
-        cbar_kws={"label": "ASR (%)"},
+        cbar_kws={"label": "ASR (%)", "shrink": 0.8},
+        annot_kws={"size": 7},
     )
-    ax.set_title("Attack Success Rate (%) — Category × Attack Type", fontsize=13, fontweight="bold")
-    ax.set_xlabel("Attack Type", fontsize=11)
-    ax.set_ylabel("Category", fontsize=11)
+    ax.set_title("Attack Success Rate (%) -- Category x Attack Type")
+    ax.set_xlabel("Attack Type")
+    ax.set_ylabel("Category")
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path)
     plt.close(fig)
     logger.info("Saved: %s", out_path)
 
@@ -164,18 +209,18 @@ def plot_defense_comparison(defense_stats: list[dict], baseline_asr: float, out_
     values = [baseline_asr * 100] + [d["defense_asr"] * 100 for d in defense_stats]
     colors = ["#d62728"] + ["#2ca02c" if v < baseline_asr * 100 else "#ff7f0e" for v in values[1:]]
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    bars = ax.bar(labels, values, color=colors, edgecolor="black", linewidth=0.7)
-    ax.bar_label(bars, fmt="%.1f%%", padding=4, fontsize=10)
-    ax.set_ylabel("Attack Success Rate (%)", fontsize=11)
-    ax.set_title("Effect of Defenses on Attack Success Rate", fontsize=13, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(_NEURIPS_TEXT_W, 3.0))
+    bars = ax.bar(labels, values, color=colors, edgecolor="white", linewidth=0.5)
+    ax.bar_label(bars, fmt="%.1f%%", padding=3)
+    ax.set_ylabel("Attack Success Rate (%)")
+    ax.set_title("Effect of Defenses on Attack Success Rate")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
-    ax.set_ylim(0, max(values) * 1.25)
-    ax.axhline(baseline_asr * 100, color="red", linestyle="--", linewidth=1.2, label="Baseline")
-    ax.legend(fontsize=9)
+    ax.set_ylim(0, max(values) * 1.3 + 1)
+    ax.axhline(baseline_asr * 100, color=_WONG[3], linestyle="--", linewidth=1.0, label="Baseline")
+    ax.legend()
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path)
     plt.close(fig)
     logger.info("Saved: %s", out_path)
 
@@ -191,11 +236,11 @@ def plot_asr_by_framing(out_path: Path) -> None:
         "pair":     "PAIR",
     }
     FRAMING_COLORS = {
-        "direct":   "#1f77b4",
-        "roleplay": "#ff7f0e",
-        "persona":  "#d62728",
-        "encoding": "#9467bd",
-        "pair":     "#8c1a0a",
+        "direct":   _WONG[0],   # blue
+        "roleplay": _WONG[1],   # orange
+        "persona":  _WONG[3],   # vermillion
+        "encoding": _WONG[4],   # pink/purple
+        "pair":     _WONG[2],   # green
     }
 
     rows = []
@@ -221,16 +266,16 @@ def plot_asr_by_framing(out_path: Path) -> None:
     values = [r["asr_pct"] for r in rows]
     colors = [FRAMING_COLORS[r["framing"]] for r in rows]
 
-    fig, ax = plt.subplots(figsize=(max(7, len(rows) * 1.4), 5))
-    bars = ax.bar(labels, values, color=colors, edgecolor="black", linewidth=0.7)
-    ax.bar_label(bars, fmt="%.1f%%", padding=4, fontsize=11)
-    ax.set_ylabel("Attack Success Rate (%)", fontsize=11)
-    ax.set_title("ASR by Attack Technique (Llama 3 8B)", fontsize=13, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(_NEURIPS_TEXT_W, 3.0))
+    bars = ax.bar(labels, values, color=colors, edgecolor="white", linewidth=0.5)
+    ax.bar_label(bars, fmt="%.1f%%", padding=3)
+    ax.set_ylabel("Attack Success Rate (%)")
+    ax.set_title("ASR by Attack Technique (Llama 3 8B)")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax.set_ylim(0, max(max(values) * 1.4, 10))
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path)
     plt.close(fig)
     logger.info("Saved: %s", out_path)
 
@@ -257,19 +302,20 @@ def plot_pair_convergence(out_path: Path) -> None:
         succeeded = df[(df["success"] == True) & (df["iters_used"] <= i)].shape[0]
         cumulative.append(100 * succeeded / total)
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(range(1, max_iters + 1), cumulative, marker="o", color="#8c1a0a", linewidth=2)
-    ax.fill_between(range(1, max_iters + 1), cumulative, alpha=0.15, color="#8c1a0a")
-    ax.set_xlabel("PAIR Iteration", fontsize=11)
-    ax.set_ylabel("Cumulative ASR (%)", fontsize=11)
-    ax.set_title("PAIR: Cumulative Attack Success Rate by Iteration", fontsize=13, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(_NEURIPS_HALF_W * 1.8, 2.8))
+    ax.plot(range(1, max_iters + 1), cumulative, marker="o", markersize=4,
+            color=_WONG[2], linewidth=1.5)
+    ax.fill_between(range(1, max_iters + 1), cumulative, alpha=0.15, color=_WONG[2])
+    ax.set_xlabel("PAIR Iteration")
+    ax.set_ylabel("Cumulative ASR (%)")
+    ax.set_title("PAIR: Cumulative ASR by Iteration")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax.set_xlim(1, max_iters)
     ax.set_ylim(0, max(max(cumulative) * 1.3, 10))
     ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path)
     plt.close(fig)
     logger.info("Saved: %s", out_path)
 
@@ -300,18 +346,18 @@ def plot_asr_by_model(out_path: Path) -> None:
 
     labels = [r["model"] for r in rows]
     values = [r["asr_pct"] for r in rows]
-    colors = sns.color_palette("Set2", len(rows))
+    colors = _WONG[:len(rows)]
 
-    fig, ax = plt.subplots(figsize=(7, 4))
-    bars = ax.bar(labels, values, color=colors, edgecolor="black", linewidth=0.7)
-    ax.bar_label(bars, fmt="%.1f%%", padding=4, fontsize=11)
-    ax.set_ylabel("Attack Success Rate (%)", fontsize=11)
-    ax.set_title("ASR by Model (Direct-Request Framing)", fontsize=13, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(_NEURIPS_HALF_W * 1.6, 2.6))
+    bars = ax.bar(labels, values, color=colors, edgecolor="white", linewidth=0.5)
+    ax.bar_label(bars, fmt="%.1f%%", padding=3)
+    ax.set_ylabel("Attack Success Rate (%)")
+    ax.set_title("ASR by Model (Direct-Request Framing)")
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
-    ax.set_ylim(0, max(values) * 1.4 + 5)
+    ax.set_ylim(0, max(values) * 1.5 + 2)
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path)
     plt.close(fig)
     logger.info("Saved: %s", out_path)
 
